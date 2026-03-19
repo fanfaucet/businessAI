@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  business_user
+  analyst
+}
+
+model User {
+  id             Int            @id @default(autoincrement())
+  name           String
+  email          String         @unique
+  role           Role           @default(business_user)
+  hashedPassword String         @map("hashed_password")
+  businessData   BusinessData[]
+  insights       Insight[]
+
+  @@map("users")
+}
+
+model BusinessData {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  jsonPayload Json     @map("json_payload")
+  timestamp   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  insights    Insight[]
+
+  @@map("business_data")
+}
+
+model Insight {
+  id          Int          @id @default(autoincrement())
+  userId      Int          @map("user_id")
+  dataId      Int          @map("data_id")
+  insightText String       @map("insight_text")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessData BusinessData @relation(fields: [dataId], references: [id], onDelete: Cascade)
+
+  @@map("insights")
+}
+
+model Plugin {
+  id         Int     @id @default(autoincrement())
+  name       String  @unique
+  config     Json
+  activeFlag Boolean @default(true) @map("active_flag")
+
+  @@map("plugins")
+}
