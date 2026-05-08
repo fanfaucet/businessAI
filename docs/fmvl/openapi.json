@@ -1,0 +1,440 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FMVL Earth Observation Advisory API",
+    "version": "0.1.0-phase1",
+    "description": "Federated Multi-Source Verification Layer (FMVL) API for Earth observation disagreement quantification. The API is read-only/advisory-only after observation ingest and contains no sensor control, tasking, actuation, or operational authority pathways.",
+    "x-advisory-only": true,
+    "x-versioning-strategy": "Semantic API version in info.version plus URL-neutral media negotiation. Breaking changes require a new major version and a parallel deployment window."
+  },
+  "servers": [
+    {
+      "url": "https://fmvl.example.nasa-sbir.invalid/api/v0",
+      "description": "Phase I reference endpoint placeholder; not a live NASA service."
+    }
+  ],
+  "security": [
+    {"ApiKeyAuth": []},
+    {"SignedTokenAuth": []}
+  ],
+  "tags": [
+    {"name": "Ingest", "description": "Observation receipt and validation; no sensor tasking or sensor control."},
+    {"name": "Analysis", "description": "Consensus Gap Field computation and disagreement quantification."},
+    {"name": "Metrics", "description": "Trust-map and trust-vector retrieval."},
+    {"name": "Audit", "description": "Lineage trace lookup with hash-chain integrity metadata."},
+    {"name": "Advisory", "description": "Advisory-only interpretation products for human review."}
+  ],
+  "paths": {
+    "/ingest/observation": {
+      "post": {
+        "tags": ["Ingest"],
+        "summary": "Register an Earth observation for disagreement analysis",
+        "description": "Accepts an observation metadata envelope and optional value payload reference. This endpoint records observations for analysis only. It cannot task, configure, retarget, steer, or otherwise control a sensor or downstream operational system.",
+        "operationId": "ingestObservation",
+        "x-advisory-only": true,
+        "x-no-control-pathway": true,
+        "x-rate-limit": {"limit": 60, "window": "PT1M", "scope": "api_key"},
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/ObservationIngestRequest"}
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Observation accepted for validation and lineage logging.",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ObservationIngestResponse"}}}
+          },
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "409": {"$ref": "#/components/responses/Conflict"},
+          "413": {"$ref": "#/components/responses/PayloadTooLarge"},
+          "429": {"$ref": "#/components/responses/RateLimited"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/analyze/disagreement-field": {
+      "post": {
+        "tags": ["Analysis"],
+        "summary": "Compute a Consensus Gap Field (CGF)",
+        "description": "Computes structural divergence between multiple Earth observation sources. CGF is not an averaging or truth-resolution product; it models where and how source assertions disagree.",
+        "operationId": "analyzeDisagreementField",
+        "x-advisory-only": true,
+        "x-no-control-pathway": true,
+        "x-rate-limit": {"limit": 20, "window": "PT1M", "scope": "api_key"},
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DisagreementFieldRequest"}}}
+        },
+        "responses": {
+          "200": {"description": "Consensus Gap Field generated.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ConsensusGapField"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "422": {"$ref": "#/components/responses/UnprocessableEntity"},
+          "429": {"$ref": "#/components/responses/RateLimited"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/metrics/trust-map": {
+      "post": {
+        "tags": ["Metrics"],
+        "summary": "Generate source trust-map metrics for an analysis window",
+        "description": "Returns trust vectors and gridded trust-map references derived from lineage completeness, calibration currency, spatial/temporal consistency, and anomaly flags. Trust values are advisory quality indicators, not assertions of ground truth.",
+        "operationId": "getTrustMap",
+        "x-advisory-only": true,
+        "x-no-control-pathway": true,
+        "x-rate-limit": {"limit": 30, "window": "PT1M", "scope": "api_key"},
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TrustMapRequest"}}}},
+        "responses": {
+          "200": {"description": "Trust-map metrics generated.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TrustMapResponse"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "429": {"$ref": "#/components/responses/RateLimited"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/audit/lineage-trace": {
+      "get": {
+        "tags": ["Audit"],
+        "summary": "Retrieve lineage trace for an observation, CGF, or advisory product",
+        "description": "Returns a lineage trace with parent-child references and hash-chain integrity metadata. The endpoint is read-only and cannot mutate lineage state.",
+        "operationId": "getLineageTrace",
+        "x-advisory-only": true,
+        "x-read-only": true,
+        "x-rate-limit": {"limit": 120, "window": "PT1M", "scope": "api_key"},
+        "parameters": [
+          {"name": "entity_id", "in": "query", "required": true, "schema": {"type": "string", "minLength": 8, "maxLength": 128}, "description": "Observation, CGF, trust-map, or advisory identifier."},
+          {"name": "include_parents", "in": "query", "required": false, "schema": {"type": "boolean", "default": true}},
+          {"name": "max_depth", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 1, "maximum": 25, "default": 10}}
+        ],
+        "responses": {
+          "200": {"description": "Lineage trace returned.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LineageTrace"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "429": {"$ref": "#/components/responses/RateLimited"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    },
+    "/advisory/interpretation": {
+      "post": {
+        "tags": ["Advisory"],
+        "summary": "Generate advisory interpretation of disagreement products",
+        "description": "Produces human-readable advisory interpretation of CGF and trust products. Output is explicitly non-operational, non-commanding, and intended for review by Earth science data users.",
+        "operationId": "generateAdvisoryInterpretation",
+        "x-advisory-only": true,
+        "x-no-control-pathway": true,
+        "x-rate-limit": {"limit": 30, "window": "PT1M", "scope": "api_key"},
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AdvisoryInterpretationRequest"}}}},
+        "responses": {
+          "200": {"description": "Advisory interpretation generated.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AdvisoryInterpretation"}}}},
+          "400": {"$ref": "#/components/responses/BadRequest"},
+          "401": {"$ref": "#/components/responses/Unauthorized"},
+          "404": {"$ref": "#/components/responses/NotFound"},
+          "422": {"$ref": "#/components/responses/UnprocessableEntity"},
+          "429": {"$ref": "#/components/responses/RateLimited"},
+          "500": {"$ref": "#/components/responses/InternalError"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {"type": "apiKey", "in": "header", "name": "X-FMVL-API-Key", "description": "Read-only advisory API key scoped to observation ingest and analysis retrieval."},
+      "SignedTokenAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT or detached JWS", "description": "Signed token carrying subject, issuer, scope, expiry, and advisory-only claims."}
+    },
+    "responses": {
+      "BadRequest": {"description": "Invalid request syntax or schema violation.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "Unauthorized": {"description": "Missing or invalid authentication.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "NotFound": {"description": "Requested entity was not found.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "Conflict": {"description": "Duplicate observation or lineage conflict.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "PayloadTooLarge": {"description": "Payload exceeds conservative Phase I ingest limits.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "UnprocessableEntity": {"description": "Request is valid JSON but cannot be analyzed due to insufficient or incompatible observations.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "RateLimited": {"description": "Rate limit exceeded. Conservative default: 60 ingest/minute, 20 CGF analyses/minute, 30 advisory or trust-map requests/minute, 120 lineage reads/minute per API key.", "headers": {"Retry-After": {"schema": {"type": "integer", "minimum": 1}, "description": "Seconds until retry is permitted."}}, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}},
+      "InternalError": {"description": "Internal service error.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+    },
+    "schemas": {
+      "ObservationIngestRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["observation", "sensor", "lineage"],
+        "properties": {
+          "observation": {"$ref": "#/components/schemas/Observation"},
+          "sensor": {"$ref": "#/components/schemas/Sensor"},
+          "lineage": {"$ref": "#/components/schemas/LineageReference"}
+        }
+      },
+      "ObservationIngestResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["observation_id", "accepted", "lineage_id", "advisory_only", "received_at"],
+        "properties": {
+          "observation_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "accepted": {"type": "boolean"},
+          "lineage_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "advisory_only": {"type": "boolean", "enum": [true]},
+          "received_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "Observation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["observation_id", "variable", "observed_at", "geometry", "value", "units", "quality_flags"],
+        "properties": {
+          "observation_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "variable": {"type": "string", "minLength": 2, "maxLength": 96, "description": "Earth observation variable, e.g., land_surface_temperature, aerosol_optical_depth, soil_moisture."},
+          "observed_at": {"type": "string", "format": "date-time"},
+          "valid_time_end": {"type": "string", "format": "date-time"},
+          "geometry": {"$ref": "#/components/schemas/GeoJSONGeometry"},
+          "value": {"oneOf": [{"type": "number"}, {"type": "array", "items": {"type": "number"}, "minItems": 1}]},
+          "units": {"type": "string", "minLength": 1, "maxLength": 32},
+          "uncertainty": {"type": "number", "minimum": 0},
+          "spatial_resolution_m": {"type": "number", "exclusiveMinimum": 0},
+          "temporal_resolution_s": {"type": "number", "exclusiveMinimum": 0},
+          "quality_flags": {"type": "array", "items": {"type": "string", "maxLength": 64}, "maxItems": 32},
+          "data_uri": {"type": "string", "format": "uri", "description": "Optional pointer to DAAC-compatible object or granule reference."}
+        }
+      },
+      "Sensor": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sensor_id", "platform", "instrument", "source_type", "calibration_version"],
+        "properties": {
+          "sensor_id": {"type": "string", "minLength": 2, "maxLength": 128},
+          "platform": {"type": "string", "minLength": 2, "maxLength": 128},
+          "instrument": {"type": "string", "minLength": 2, "maxLength": 128},
+          "source_type": {"type": "string", "enum": ["satellite", "airborne", "in_situ", "model_reanalysis", "derived_product", "synthetic_validation"]},
+          "calibration_version": {"type": "string", "minLength": 1, "maxLength": 64},
+          "processing_level": {"type": "string", "enum": ["L0", "L1", "L2", "L3", "L4", "model"]},
+          "producer": {"type": "string", "maxLength": 128}
+        }
+      },
+      "DisagreementFieldRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["observation_ids", "variable", "analysis_window", "spatial_grid"],
+        "properties": {
+          "observation_ids": {"type": "array", "items": {"type": "string", "minLength": 8, "maxLength": 128}, "minItems": 2, "maxItems": 1000},
+          "variable": {"type": "string", "minLength": 2, "maxLength": 96},
+          "analysis_window": {"$ref": "#/components/schemas/TimeWindow"},
+          "spatial_grid": {"$ref": "#/components/schemas/SpatialGrid"},
+          "divergence_metrics": {"type": "array", "items": {"type": "string", "enum": ["distributional_distance", "sign_disagreement", "gradient_disagreement", "temporal_phase_shift", "lineage_weighted_residual"]}, "default": ["distributional_distance", "lineage_weighted_residual"]}
+        }
+      },
+      "ConsensusGapField": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cgf_id", "variable", "analysis_window", "spatial_grid", "gap_statistics", "cells", "lineage_id", "advisory_only"],
+        "properties": {
+          "cgf_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "variable": {"type": "string", "minLength": 2, "maxLength": 96},
+          "analysis_window": {"$ref": "#/components/schemas/TimeWindow"},
+          "spatial_grid": {"$ref": "#/components/schemas/SpatialGrid"},
+          "gap_statistics": {"$ref": "#/components/schemas/GapStatistics"},
+          "cells": {"type": "array", "items": {"$ref": "#/components/schemas/CGFCell"}, "minItems": 1},
+          "lineage_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "advisory_only": {"type": "boolean", "enum": [true]}
+        }
+      },
+      "CGFCell": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cell_id", "centroid", "gap_magnitude", "gap_direction", "source_count", "confidence"],
+        "properties": {
+          "cell_id": {"type": "string", "maxLength": 128},
+          "centroid": {"$ref": "#/components/schemas/Point"},
+          "gap_magnitude": {"type": "number", "minimum": 0},
+          "gap_direction": {"type": "array", "items": {"type": "number"}, "minItems": 1, "maxItems": 8},
+          "source_count": {"type": "integer", "minimum": 2},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "dominant_disagreement_mode": {"type": "string", "enum": ["bias", "variance", "spatial_gradient", "temporal_phase", "lineage_quality", "insufficient_overlap"]}
+        }
+      },
+      "GapStatistics": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["mean_gap", "median_gap", "max_gap", "coverage_fraction"],
+        "properties": {
+          "mean_gap": {"type": "number", "minimum": 0},
+          "median_gap": {"type": "number", "minimum": 0},
+          "max_gap": {"type": "number", "minimum": 0},
+          "coverage_fraction": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      },
+      "TrustMapRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entity_ids", "analysis_window"],
+        "properties": {
+          "entity_ids": {"type": "array", "items": {"type": "string", "minLength": 8, "maxLength": 128}, "minItems": 1, "maxItems": 1000},
+          "analysis_window": {"$ref": "#/components/schemas/TimeWindow"},
+          "include_grid_reference": {"type": "boolean", "default": true}
+        }
+      },
+      "TrustMapResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["trust_map_id", "trust_vectors", "lineage_id", "advisory_only"],
+        "properties": {
+          "trust_map_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "trust_vectors": {"type": "array", "items": {"$ref": "#/components/schemas/TrustVector"}, "minItems": 1},
+          "grid_data_uri": {"type": "string", "format": "uri"},
+          "lineage_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "advisory_only": {"type": "boolean", "enum": [true]}
+        }
+      },
+      "TrustVector": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entity_id", "lineage_score", "calibration_score", "consistency_score", "anomaly_score", "aggregate_trust"],
+        "properties": {
+          "entity_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "lineage_score": {"type": "number", "minimum": 0, "maximum": 1},
+          "calibration_score": {"type": "number", "minimum": 0, "maximum": 1},
+          "consistency_score": {"type": "number", "minimum": 0, "maximum": 1},
+          "anomaly_score": {"type": "number", "minimum": 0, "maximum": 1, "description": "Higher values indicate stronger anomaly evidence."},
+          "aggregate_trust": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      },
+      "LineageTrace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lineage_id", "entity_id", "nodes", "edges", "hash_chain_valid"],
+        "properties": {
+          "lineage_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "entity_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "nodes": {"type": "array", "items": {"$ref": "#/components/schemas/LineageNode"}, "minItems": 1},
+          "edges": {"type": "array", "items": {"$ref": "#/components/schemas/LineageEdge"}},
+          "hash_chain_valid": {"type": "boolean"}
+        }
+      },
+      "LineageReference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_uri", "producer", "processing_step", "content_sha256"],
+        "properties": {
+          "source_uri": {"type": "string", "format": "uri"},
+          "producer": {"type": "string", "maxLength": 128},
+          "processing_step": {"type": "string", "maxLength": 128},
+          "content_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+          "parent_entity_ids": {"type": "array", "items": {"type": "string", "minLength": 8, "maxLength": 128}, "maxItems": 128}
+        }
+      },
+      "LineageNode": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entity_id", "entity_type", "content_sha256", "previous_hash", "current_hash", "created_at"],
+        "properties": {
+          "entity_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "entity_type": {"type": "string", "enum": ["observation", "sensor", "cgf", "trust_map", "advisory"]},
+          "content_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+          "previous_hash": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$|^GENESIS$"},
+          "current_hash": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "LineageEdge": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from_entity_id", "to_entity_id", "relationship"],
+        "properties": {
+          "from_entity_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "to_entity_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "relationship": {"type": "string", "enum": ["derived_from", "calibrated_by", "compared_with", "summarized_by", "interpreted_by"]}
+        }
+      },
+      "AdvisoryInterpretationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cgf_id", "trust_map_id", "audience"],
+        "properties": {
+          "cgf_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "trust_map_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "audience": {"type": "string", "enum": ["science_team", "data_steward", "daac_operator", "program_review"]},
+          "max_findings": {"type": "integer", "minimum": 1, "maximum": 25, "default": 10}
+        }
+      },
+      "AdvisoryInterpretation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["advisory_id", "summary", "findings", "limitations", "confidence", "lineage_id", "advisory_only"],
+        "properties": {
+          "advisory_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "summary": {"type": "string", "maxLength": 2000},
+          "findings": {"type": "array", "items": {"$ref": "#/components/schemas/AdvisoryFinding"}, "minItems": 1},
+          "limitations": {"type": "array", "items": {"type": "string", "maxLength": 512}, "minItems": 1},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+          "lineage_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "advisory_only": {"type": "boolean", "enum": [true]}
+        }
+      },
+      "AdvisoryFinding": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding_type", "description", "supporting_entities", "confidence"],
+        "properties": {
+          "finding_type": {"type": "string", "enum": ["structural_disagreement", "lineage_gap", "trust_degradation", "coverage_limitation", "temporal_inconsistency"]},
+          "description": {"type": "string", "maxLength": 1024},
+          "supporting_entities": {"type": "array", "items": {"type": "string", "minLength": 8, "maxLength": 128}, "minItems": 1},
+          "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      },
+      "GeoJSONGeometry": {
+        "type": "object",
+        "required": ["type", "coordinates"],
+        "properties": {
+          "type": {"type": "string", "enum": ["Point", "Polygon", "MultiPolygon"]},
+          "coordinates": {"type": "array", "items": {}}
+        }
+      },
+      "Point": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lon", "lat"],
+        "properties": {
+          "lon": {"type": "number", "minimum": -180, "maximum": 180},
+          "lat": {"type": "number", "minimum": -90, "maximum": 90}
+        }
+      },
+      "TimeWindow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["start", "end"],
+        "properties": {
+          "start": {"type": "string", "format": "date-time"},
+          "end": {"type": "string", "format": "date-time"}
+        }
+      },
+      "SpatialGrid": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["crs", "resolution", "bounds"],
+        "properties": {
+          "crs": {"type": "string", "default": "EPSG:4326"},
+          "resolution": {"type": "number", "exclusiveMinimum": 0},
+          "bounds": {"type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4, "description": "[min_lon, min_lat, max_lon, max_lat]"}
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["error", "message", "correlation_id", "advisory_only"],
+        "properties": {
+          "error": {"type": "string", "maxLength": 96},
+          "message": {"type": "string", "maxLength": 1024},
+          "correlation_id": {"type": "string", "minLength": 8, "maxLength": 128},
+          "details": {"type": "object", "additionalProperties": true},
+          "advisory_only": {"type": "boolean", "enum": [true]}
+        }
+      }
+    }
+  }
+}
