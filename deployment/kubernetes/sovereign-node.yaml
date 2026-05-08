@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: annabanai-sovereign-node
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: advisory-runtime
+  namespace: annabanai-sovereign-node
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: advisory-runtime
+  template:
+    metadata:
+      labels:
+        app: advisory-runtime
+    spec:
+      containers:
+        - name: runtime
+          image: annabanai/runtime:placeholder
+          env:
+            - name: ANNABANAI_MODE
+              value: sovereign-edge
+          ports:
+            - containerPort: 8080

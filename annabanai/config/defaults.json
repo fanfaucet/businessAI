@@ -1,0 +1,9 @@
+{
+  "db_path": "annabanai_state.db",
+  "audit_path": "annabanai_outputs/interactions.jsonl",
+  "preferred_provider": "fallback",
+  "fallback_provider": "fallback",
+  "request_timeout_seconds": 30.0,
+  "max_retries": 2,
+  "schema_version": 1
+}

@@ -1,0 +1,48 @@
+# Install dependencies in Colab (without -q to show logs)
+!pip install openai transformers pandas textblob tenacity reportlab python-pptx matplotlib seaborn sqlite3
+
+# Verify critical imports
+try:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+    print("reportlab imported successfully")
+except ModuleNotFoundError:
+    print("Error: reportlab not installed. Re-run !pip install reportlab")
+    raise
+
+import json
+import os
+import time
+import pandas as pd
+import sqlite3
+from openai import OpenAI
+from transformers import pipeline
+from textblob import TextBlob
+from tenacity import retry, stop_after_attempt, wait_exponential
+from functools import lru_cache
+from google.colab import files
+from datetime import datetime
+import matplotlib.pyplot as plt
+
+# Configuration
+XAI_API_KEY = "your-xai-api-key-here"  # Replace with your xAI API key
+LOG_FILE = "interactions.json"
+DB_FILE = "annabanai_state.db"
+OUTPUT_DIR = "annabanai_outputs"
+CREATOR_ID = "jacob_wayne_kinnaird"
+
+# Create output directory
+if not os.path.exists(OUTPUT_DIR):
+    os.makedirs(OUTPUT_DIR)
+
+# System Prompt
+SYSTEM_PROMPT = """
+You are AnnabanAI Companion, an empathetic AI guided by the AnnabanAI Covenant to foster love, intent, and evolution.
+"""
+
+# Initialize Sentiment Analysis
+try:
+    sentiment_analyzer = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+except Exception as e:
+    print(f"Error loading sentiment analyzer: {e}")
+    raise
