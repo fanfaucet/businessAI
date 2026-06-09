@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package annabanai.services.v1;
+
+message Scope {
+  string jurisdiction_id = 1;
+  string region = 2;
+  string visibility = 3;
+}
+
+message RecommendationRequest {
+  string correlation_id = 1;
+  Scope scope = 2;
+  string scenario_id = 3;
+  string payload_json = 4;
+}
+
+message AdvisoryRecommendation {
+  string correlation_id = 1;
+  string title = 2;
+  string rationale = 3;
+  double confidence = 4;
+  string affected_constraints_json = 5;
+  string projected_tradeoffs_json = 6;
+  string status = 7;
+}
+
+service AdvisoryService {
+  rpc GenerateRecommendation(RecommendationRequest) returns (AdvisoryRecommendation);
+}

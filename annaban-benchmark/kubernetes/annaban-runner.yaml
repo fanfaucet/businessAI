@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: annaban-runner
+spec:
+  containers:
+  - name: runner
+    image: annaban/benchmark:latest

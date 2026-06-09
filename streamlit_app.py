@@ -3,6 +3,8 @@ import pandas as pd
 import math
 from pathlib import Path
 
+from annabanai import AnnabanRuntime, RuntimeConfig
+
 # Set the title and favicon that appear in the Browser's tab bar.
 st.set_page_config(
     page_title='GDP dashboard',
@@ -58,6 +60,29 @@ def get_gdp_data():
     return gdp_df
 
 gdp_df = get_gdp_data()
+BOOTSTRAP_SCRIPT = (Path(__file__).parent / 'annabanai_bootstrap_colab.txt').read_text()
+RUNTIME_DB = Path(__file__).parent / 'annabanai_outputs' / 'runtime_state.db'
+RUNTIME_AUDIT = Path(__file__).parent / 'annabanai_outputs' / 'interactions.jsonl'
+ARCHITECTURE_NOTES = """
+AnnabanAI Review Directive:
+- Unify memory: make SQLite the source of truth; JSON as audit mirror.
+- Stabilize inference: add provider abstraction (OpenAI/xAI/fallback).
+- Add orchestration: central runtime class with deterministic logging flow.
+- Fuse sentiment: weighted DistilBERT + TextBlob signal.
+"""
+
+
+@st.cache_resource
+def get_annaban_runtime():
+    """Initialize the AnnabanAI runtime once per Streamlit session."""
+    return AnnabanRuntime(
+        RuntimeConfig(
+            db_path=str(RUNTIME_DB),
+            audit_path=str(RUNTIME_AUDIT),
+            preferred_provider='fallback',
+            fallback_provider='fallback',
+        )
+    )
 
 # -----------------------------------------------------------------------------
 # Draw the actual page
@@ -149,3 +174,90 @@ for i, country in enumerate(selected_countries):
             delta=growth,
             delta_color=delta_color
         )
+
+st.header('AnnabanAI orchestration console', divider='gray')
+runtime = get_annaban_runtime()
+console_tab, monitor_tab, events_tab, memory_tab = st.tabs([
+    'Prompt workspace',
+    'Runtime monitor',
+    'Event viewer',
+    'Memory inspection',
+])
+
+with console_tab:
+    with st.container(border=True):
+        st.subheader('Task execution panel')
+        user_prompt = st.text_area(
+            'Send a prompt through AnnabanRuntime',
+            placeholder='Ask AnnabanAI to plan, review, execute, or audit a task…',
+            key='annabanai_runtime_prompt',
+        )
+        provider_choice = st.selectbox('Provider route', ['fallback', 'openai', 'xai'], index=0)
+        if st.button('Run orchestration', type='primary') and user_prompt:
+            result = runtime.process_input(
+                user_prompt,
+                user_id='streamlit_user',
+                provider_name=provider_choice,
+                metadata={'surface': 'streamlit'},
+            )
+            st.session_state['last_runtime_result'] = result
+        if 'last_runtime_result' in st.session_state:
+            result = st.session_state['last_runtime_result']
+            st.markdown('**Runtime response**')
+            st.write(result.response)
+            st.caption(f'Correlation ID: {result.correlation_id}')
+            st.json({
+                'sentiment': result.sentiment.__dict__,
+                'provider': result.provider_response.__dict__,
+            })
+
+with monitor_tab:
+    health = runtime.health()
+    st.subheader('Runtime health')
+    st.json(health)
+
+with events_tab:
+    st.subheader('Deterministic event replay')
+    st.dataframe(runtime.memory_manager.replay_events()[-50:], use_container_width=True)
+
+with memory_tab:
+    st.subheader('SQLite source-of-truth interactions')
+    st.dataframe(runtime.memory_manager.recent_interactions(limit=20), use_container_width=True)
+
+st.header('Illustration boxes', divider='gray')
+st.caption('Use these boxed sections to sketch ideas like a ChatGPT-style canvas.')
+with st.container(border=True):
+    st.subheader('Canvas boot script')
+    st.text_area(
+        'Colab bootstrap code',
+        value=BOOTSTRAP_SCRIPT,
+        height=360,
+        key='canvas_boot_script',
+    )
+    st.download_button(
+        'Download bootstrap script',
+        data=BOOTSTRAP_SCRIPT,
+        file_name='annabanai_bootstrap_colab.txt',
+        mime='text/plain',
+    )
+
+with st.container(border=True):
+    st.subheader('AnnabanAI architecture review')
+    st.text_area(
+        'Structured handoff notes',
+        value=ARCHITECTURE_NOTES.strip(),
+        height=170,
+        key='architecture_review_notes',
+    )
+
+box_count = st.slider('Number of illustration boxes', min_value=1, max_value=6, value=3)
+
+for box_number in range(1, box_count + 1):
+    with st.container(border=True):
+        st.subheader(f'Illustration box {box_number}')
+        prompt_text = st.text_area(
+            f'Illustration prompt {box_number}',
+            placeholder='Describe what you want to illustrate…',
+            key=f'illustration_prompt_{box_number}',
+        )
+        st.markdown(prompt_text if prompt_text else '_Your illustration notes will appear here._')
